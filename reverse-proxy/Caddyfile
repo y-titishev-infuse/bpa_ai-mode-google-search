@@ -8,13 +8,13 @@
 	}
 }
 
-# Redirect plain HTTP on :80 to HTTPS API port
+# Redirect plain HTTP on :80 to default HTTPS (443)
 http://{$DOMAIN} {
-	redir https://{$DOMAIN}:4001{uri} 301
+	redir https://{$DOMAIN}{uri} 301
 }
 
-# API over HTTPS on :4001
-{$DOMAIN}:4001 {
+# API over HTTPS on default HTTPS port (443)
+{$DOMAIN} {
 	encode gzip
 	
 	# Increase request body size limit for bulk operations

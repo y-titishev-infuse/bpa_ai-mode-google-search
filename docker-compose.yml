@@ -54,7 +54,7 @@ services:
         condition: service_started
     ports:
       - "80:80"                               # HTTP for ACME and redirect
-      - "${API_PORT:-4001}:4001"              # API over HTTPS
+      - "443:443"                             # API over HTTPS (default HTTPS port)
       - "3000:3000"                           # noVNC over HTTPS
     volumes:
       - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
