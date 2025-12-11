@@ -1,8 +1,25 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 export const REQUEST_ID_HEADER = 'X-Request-Id';
+
+interface RequestWithId extends Request {
+  requestId?: string;
+}
+
+interface ResponseWithMeta {
+  meta?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 /**
  * Interceptor to handle X-Request-Id header
@@ -13,26 +30,30 @@ export const REQUEST_ID_HEADER = 'X-Request-Id';
  */
 @Injectable()
 export class RequestIdInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const ctx = context.switchToHttp();
-    const request = ctx.getRequest();
-    const response = ctx.getResponse();
+    const request = ctx.getRequest<RequestWithId>();
+    const response = ctx.getResponse<Response>();
     const startTime = Date.now();
 
     // X-Request-Id is REQUIRED
-    const requestId = request.headers[REQUEST_ID_HEADER.toLowerCase()] || 
-                      request.headers['x-request-id'];
-    
+    const requestId =
+      (request.headers[REQUEST_ID_HEADER.toLowerCase()] as string) ||
+      (request.headers['x-request-id'] as string);
+
     if (!requestId) {
-      throw new HttpException({
-        error: {
-          code: 'BAD_REQUEST',
-          message: 'Missing required header: X-Request-Id',
+      throw new HttpException(
+        {
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Missing required header: X-Request-Id',
+          },
+          meta: {
+            requestId: 'unknown',
+          },
         },
-        meta: {
-          requestId: 'unknown',
-        },
-      }, HttpStatus.BAD_REQUEST);
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Store in request for later use
@@ -42,15 +63,16 @@ export class RequestIdInterceptor implements NestInterceptor {
     response.setHeader(REQUEST_ID_HEADER, requestId);
 
     return next.handle().pipe(
-      map((data) => {
+      map((data: unknown) => {
         const processingTimeMs = Date.now() - startTime;
 
         // If response already has meta, just ensure requestId is there
         if (data && typeof data === 'object' && 'meta' in data) {
+          const dataWithMeta = data as ResponseWithMeta;
           return {
-            ...data,
+            ...dataWithMeta,
             meta: {
-              ...data.meta,
+              ...dataWithMeta.meta,
               requestId,
               processingTimeMs,
             },

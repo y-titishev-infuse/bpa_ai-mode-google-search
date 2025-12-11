@@ -11,11 +11,11 @@ export class JobProgressDto {
 }
 
 export class JobResultDto {
-  @ApiProperty({ description: 'Text result from the prompt processing' })
-  text: string;
+  @ApiProperty({ description: 'JSON result from the prompt processing' })
+  json: string;
 
-  @ApiPropertyOptional({ description: 'HTML content if available' })
-  html?: string;
+  @ApiPropertyOptional({ description: 'Raw text content if available' })
+  raw_text?: string;
 
   @ApiPropertyOptional({ description: 'Worker ID that processed this job' })
   usedWorker?: number;
@@ -25,16 +25,22 @@ export class JobStatusDto {
   @ApiProperty({ description: 'Unique job identifier' })
   jobId: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Current job status',
     enum: ['pending', 'processing', 'completed', 'failed'],
   })
   status: JobState;
 
-  @ApiPropertyOptional({ description: 'Job progress information', type: JobProgressDto })
+  @ApiPropertyOptional({
+    description: 'Job progress information',
+    type: JobProgressDto,
+  })
   progress?: JobProgressDto;
 
-  @ApiPropertyOptional({ description: 'Job result (only when completed)', type: JobResultDto })
+  @ApiPropertyOptional({
+    description: 'Job result (only when completed)',
+    type: JobResultDto,
+  })
   result?: JobResultDto | null;
 
   @ApiPropertyOptional({ description: 'Error message (only when failed)' })

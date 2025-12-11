@@ -17,7 +17,10 @@ export class ApiErrorDetail {
 }
 
 export class ApiError {
-  @ApiProperty({ description: 'Error code in SNAKE_CASE format', example: 'VALIDATION_ERROR' })
+  @ApiProperty({
+    description: 'Error code in SNAKE_CASE format',
+    example: 'VALIDATION_ERROR',
+  })
   code: string;
 
   @ApiProperty({ description: 'Human-readable error message' })
@@ -31,7 +34,9 @@ export class ApiError {
 }
 
 export class ApiMeta {
-  @ApiProperty({ description: 'Request correlation ID from X-Request-Id header' })
+  @ApiProperty({
+    description: 'Request correlation ID from X-Request-Id header',
+  })
   requestId: string;
 
   @ApiPropertyOptional({ description: 'Processing time in milliseconds' })
@@ -50,7 +55,10 @@ export class ApiResponse<T = any> {
   @ApiPropertyOptional({ description: 'Response data (present on success)' })
   data?: T;
 
-  @ApiPropertyOptional({ description: 'Error information (present on failure)', type: ApiError })
+  @ApiPropertyOptional({
+    description: 'Error information (present on failure)',
+    type: ApiError,
+  })
   error?: ApiError;
 
   @ApiProperty({ description: 'Response metadata', type: ApiMeta })
@@ -60,7 +68,11 @@ export class ApiResponse<T = any> {
 /**
  * Helper to create success response
  */
-export function createSuccessResponse<T>(data: T, requestId: string, processingTimeMs?: number): ApiResponse<T> {
+export function createSuccessResponse<T>(
+  data: T,
+  requestId: string,
+  processingTimeMs?: number,
+): ApiResponse<T> {
   return {
     data,
     meta: {

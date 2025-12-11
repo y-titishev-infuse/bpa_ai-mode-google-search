@@ -8,10 +8,17 @@ const LOG_DIR = process.env.LOG_DIR || 'logs';
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
-  winston.format.printf(({ timestamp, level, message, context, stack }) => {
+  winston.format.printf((info) => {
+    const { timestamp, level, message, context, stack } = info as {
+      timestamp?: string;
+      level: string;
+      message: string;
+      context?: string;
+      stack?: string;
+    };
     const ctx = context ? `[${context}]` : '';
     const stackTrace = stack ? `\n${stack}` : '';
-    return `${timestamp} ${level.toUpperCase()} ${ctx} ${message}${stackTrace}`;
+    return `${timestamp ?? ''} ${level.toUpperCase()} ${ctx} ${message}${stackTrace}`;
   }),
 );
 

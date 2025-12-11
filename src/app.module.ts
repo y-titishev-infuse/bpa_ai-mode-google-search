@@ -9,7 +9,7 @@ import { validate } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ 
+    ConfigModule.forRoot({
       isGlobal: true,
       validate, // Validate all required env vars on startup
     }),
@@ -24,14 +24,17 @@ import { validate } from './config/env.validation';
         if (!redisUrl) {
           throw new Error('REDIS_URL environment variable is required');
         }
-        
+
         const u = new URL(redisUrl);
         const host = u.hostname;
         const port = Number(u.port || '6379');
-        const password = u.password ? decodeURIComponent(u.password) : undefined;
-        
-        const jobTtl = configService.get<number>('JOB_RESULTS_TTL_SEC') || 86400;
-        
+        const password = u.password
+          ? decodeURIComponent(u.password)
+          : undefined;
+
+        const jobTtl =
+          configService.get<number>('JOB_RESULTS_TTL_SEC') || 86400;
+
         return {
           redis: password ? { host, port, password } : { host, port },
           defaultJobOptions: {

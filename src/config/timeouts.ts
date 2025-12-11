@@ -14,7 +14,9 @@ export class TimeoutsService {
     if (v === undefined || v === null) return def;
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) {
-      console.warn(`[TIMEOUTS] Invalid ${envName}=${v}, using default ${def}ms`);
+      console.warn(
+        `[TIMEOUTS] Invalid ${envName}=${v}, using default ${def}ms`,
+      );
       return def;
     }
     return n;

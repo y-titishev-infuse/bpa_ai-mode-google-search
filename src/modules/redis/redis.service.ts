@@ -9,11 +9,11 @@ export class RedisService implements OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     const url = this.configService.get<string>('REDIS_URL');
-    
+
     if (!url) {
       throw new Error('REDIS_URL environment variable is required');
     }
-    
+
     this.client = new IORedis(url, {
       lazyConnect: false,
       maxRetriesPerRequest: null,
@@ -52,7 +52,11 @@ export class RedisService implements OnModuleDestroy {
     try {
       await this.client.quit();
     } catch {
-      try { this.client.disconnect(); } catch {}
+      try {
+        this.client.disconnect();
+      } catch {
+        // Ignore disconnect errors
+      }
     }
   }
 }

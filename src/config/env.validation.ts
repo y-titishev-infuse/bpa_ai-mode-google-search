@@ -1,13 +1,21 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, IsNotEmpty, validateSync, IsOptional, IsNumber, Min, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  validateSync,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsIn,
+} from 'class-validator';
 
 /**
  * Environment variables validation schema
- * 
+ *
  * REQUIRED for API service:
  * - REDIS_URL
  * - WORKER_BASE_URLS
- * 
+ *
  * Optional variables have sensible defaults.
  * Browser-worker specific vars (PY_*, PROXY_*, etc.) are not validated here
  * as they are used by Python workers, not the NestJS API.
@@ -16,13 +24,16 @@ export class EnvironmentVariables {
   // ===========================================
   // REQUIRED - API will fail without these
   // ===========================================
-  
+
   @IsString()
   @IsNotEmpty({ message: 'REDIS_URL is required' })
   REDIS_URL: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'WORKER_BASE_URLS is required (comma-separated list of worker endpoints)' })
+  @IsNotEmpty({
+    message:
+      'WORKER_BASE_URLS is required (comma-separated list of worker endpoints)',
+  })
   WORKER_BASE_URLS: string;
 
   // ===========================================
@@ -157,13 +168,17 @@ export function validate(config: Record<string, unknown>) {
 
   if (errors.length > 0) {
     const errorMessages = errors
-      .map(err => {
-        const constraints = err.constraints ? Object.values(err.constraints).join(', ') : 'Invalid value';
+      .map((err) => {
+        const constraints = err.constraints
+          ? Object.values(err.constraints).join(', ')
+          : 'Invalid value';
         return `  - ${err.property}: ${constraints}`;
       })
       .join('\n');
-    
-    throw new Error(`\n\nEnvironment validation failed:\n${errorMessages}\n\nPlease check your .env file.\n`);
+
+    throw new Error(
+      `\n\nEnvironment validation failed:\n${errorMessages}\n\nPlease check your .env file.\n`,
+    );
   }
 
   return validatedConfig;

@@ -16,10 +16,6 @@ import { TimeoutsService } from '../../../../config/timeouts';
     WorkerModule,
   ],
   controllers: [SearcherController],
-  providers: [
-    SearcherService,
-    SearcherProcessor,
-    TimeoutsService,
-  ],
+  providers: [SearcherService, SearcherProcessor, TimeoutsService],
 })
 export class SearcherModule {}

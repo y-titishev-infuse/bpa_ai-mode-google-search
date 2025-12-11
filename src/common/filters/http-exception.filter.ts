@@ -1,4 +1,11 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { REQUEST_ID_HEADER } from '../interceptors/request-id.interceptor';
 
@@ -28,44 +35,53 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     // Get request ID from request or generate
-    const requestId = (request as any).requestId || 
-                      request.headers[REQUEST_ID_HEADER.toLowerCase()] ||
-                      request.headers['x-request-id'] ||
-                      'unknown';
+    const reqWithId = request as Request & { requestId?: string };
+    const requestId =
+      reqWithId.requestId ||
+      (request.headers[REQUEST_ID_HEADER.toLowerCase()] as string) ||
+      (request.headers['x-request-id'] as string) ||
+      'unknown';
 
     // Set response header
     response.setHeader(REQUEST_ID_HEADER, requestId);
 
     let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string = 'Internal server error';
-    let details: any;
+    let details: Record<string, unknown> | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        const resp = exceptionResponse as any;
-        
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const resp = exceptionResponse as Record<string, unknown>;
+
         // If response already has error object in contract format, use it directly
-        if (resp.error && typeof resp.error === 'object' && resp.error.code) {
+        const respError = resp.error as Record<string, unknown> | undefined;
+        if (respError && typeof respError === 'object' && respError.code) {
           response.status(status).json({
-            error: resp.error,
+            error: respError,
             meta: {
               requestId,
             },
           });
           return;
         }
-        
-        message = resp.message || resp.error || 'An error occurred';
-        
+
+        message =
+          (resp.message as string) ||
+          (resp.error as string) ||
+          'An error occurred';
+
         // Handle validation errors from class-validator
         if (Array.isArray(resp.message)) {
           details = {
-            fields: resp.message.map((msg: string) => ({
+            fields: (resp.message as string[]).map((msg: string) => ({
               field: 'unknown',
               code: 'VALIDATION_ERROR',
               message: msg,
@@ -77,11 +93,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = exception.message || 'Internal server error';
-      this.logger.error(`Unhandled exception: ${exception.message}`, exception.stack);
+      this.logger.error(
+        `Unhandled exception: ${exception.message}`,
+        exception.stack,
+      );
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';
-      this.logger.error(`Unknown exception: ${exception}`);
+      this.logger.error(`Unknown exception: ${String(exception)}`);
     }
 
     const errorCode = STATUS_TO_ERROR_CODE[status] || 'INTERNAL_ERROR';

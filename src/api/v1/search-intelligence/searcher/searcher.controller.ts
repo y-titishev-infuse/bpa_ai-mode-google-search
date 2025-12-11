@@ -1,5 +1,22 @@
-import { Controller, Get, Post, Param, Body, Query, Res, HttpException, HttpStatus, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Query,
+  Res,
+  HttpException,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,7 +27,7 @@ import { CreatePromptDto } from './dto/create-prompt.dto';
 
 /**
  * Searcher Controller
- * 
+ *
  * API paths follow contract: /api/v{major}/{businessFlow}/{tool}/{action}
  * - businessFlow: search-intelligence
  * - tool: searcher
@@ -18,7 +35,11 @@ import { CreatePromptDto } from './dto/create-prompt.dto';
  */
 @ApiTags('search-intelligence/searcher')
 @Controller('api/v1/search-intelligence/searcher')
-@ApiHeader({ name: 'X-Request-Id', description: 'Request correlation ID', required: true })
+@ApiHeader({
+  name: 'X-Request-Id',
+  description: 'Request correlation ID',
+  required: true,
+})
 export class SearcherController {
   constructor(
     private readonly redis: RedisService,
@@ -35,7 +56,12 @@ export class SearcherController {
   @Post('prompts')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Submit a prompt for async processing' })
-  @ApiQuery({ name: 'worker', required: false, description: 'Preferred worker ID (1-15)', type: Number })
+  @ApiQuery({
+    name: 'worker',
+    required: false,
+    description: 'Preferred worker ID (1-15)',
+    type: Number,
+  })
   @ApiResponse({ status: 202, description: 'Job accepted for processing' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
   @ApiResponse({ status: 422, description: 'Validation error' })
@@ -44,22 +70,28 @@ export class SearcherController {
     @Query('worker') workerQuery?: string,
   ): Promise<{ jobId: string }> {
     let preferredWorker: number | undefined;
-    
+
     if (workerQuery !== undefined) {
       const n = Number(workerQuery);
       if (!Number.isFinite(n) || n < 1) {
-        throw new HttpException({
-          error: {
-            code: 'BAD_REQUEST',
-            message: 'Invalid worker parameter',
-            details: { field: 'worker', value: workerQuery },
+        throw new HttpException(
+          {
+            error: {
+              code: 'BAD_REQUEST',
+              message: 'Invalid worker parameter',
+              details: { field: 'worker', value: workerQuery },
+            },
           },
-        }, HttpStatus.BAD_REQUEST);
+          HttpStatus.BAD_REQUEST,
+        );
       }
       preferredWorker = Math.trunc(n);
     }
 
-    const jobId = await this.searcherService.enqueue(dto.prompt, preferredWorker);
+    const jobId = await this.searcherService.enqueue(
+      dto.prompt,
+      preferredWorker,
+    );
     return { jobId };
   }
 
@@ -81,17 +113,35 @@ export class SearcherController {
    */
   @Get('jobs')
   @ApiOperation({ summary: 'List all jobs or filter by status' })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'processing', 'completed', 'failed'] })
-  @ApiQuery({ name: 'limit', required: false, description: 'Max items per page (default: 50, max: 100)' })
-  @ApiQuery({ name: 'pageToken', required: false, description: 'Pagination cursor' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['pending', 'processing', 'completed', 'failed'],
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Max items per page (default: 50, max: 100)',
+  })
+  @ApiQuery({
+    name: 'pageToken',
+    required: false,
+    description: 'Pagination cursor',
+  })
   @ApiResponse({ status: 200, description: 'Jobs list retrieved' })
   async getJobs(
     @Query('status') status?: string,
     @Query('limit') limit?: string,
     @Query('pageToken') pageToken?: string,
   ) {
-    const parsedLimit = limit ? Math.min(Math.max(1, parseInt(limit, 10) || 50), 100) : 50;
-    return await this.searcherService.getAllJobs(status, parsedLimit, pageToken);
+    const parsedLimit = limit
+      ? Math.min(Math.max(1, parseInt(limit, 10) || 50), 100)
+      : 50;
+    return await this.searcherService.getAllJobs(
+      status,
+      parsedLimit,
+      pageToken,
+    );
   }
 
   // ==================== HEALTH ====================
@@ -102,25 +152,27 @@ export class SearcherController {
   async getHealth() {
     const rtt = await this.redis.ping();
     const redisOk = typeof rtt === 'number';
-    
+
     const workerCount = this.worker.getWorkerCount();
     const workersHealth = await Promise.all(
-      Array.from({ length: workerCount }, (_, i) => 
-        this.worker.health(i + 1)
-          .then(health => ({ workerId: i + 1, ...health }))
-          .catch(err => ({ 
-            workerId: i + 1, 
-            ok: false, 
-            error: err?.message || String(err) 
-          }))
-      )
+      Array.from({ length: workerCount }, (_, i) =>
+        this.worker
+          .health(i + 1)
+          .then((health) => ({ workerId: i + 1, ...health }))
+
+          .catch((err) => ({
+            workerId: i + 1,
+            ok: false as const,
+            error: (err as Error)?.message || String(err),
+          })),
+      ),
     );
-    
-    const healthyWorkers = workersHealth.filter(w => w.ok);
-    const busyWorkers = workersHealth.filter(w => 'busy' in w && w.busy);
+
+    const healthyWorkers = workersHealth.filter((w) => w.ok);
+    const busyWorkers = workersHealth.filter((w) => 'busy' in w && w.busy);
     const allWorkersOk = healthyWorkers.length === workerCount;
     const anyWorkerOk = healthyWorkers.length > 0;
-    
+
     return {
       status: anyWorkerOk ? 'ok' : 'degraded',
       app: 'ok',
@@ -130,19 +182,19 @@ export class SearcherController {
         total: workerCount,
         healthy: healthyWorkers.length,
         busy: busyWorkers.length,
-        status: allWorkersOk ? 'ok' : (anyWorkerOk ? 'degraded' : 'fail'),
-        details: workersHealth.map(w => {
+        status: allWorkersOk ? 'ok' : anyWorkerOk ? 'degraded' : 'fail',
+        details: workersHealth.map((w) => {
           let errorMsg: string | null = null;
           if (!w.ok) {
             if ('chrome_alive' in w && !w.chrome_alive) {
               errorMsg = 'browser crashed or zombie';
             } else if ('error' in w && w.error) {
-              errorMsg = w.error as string;
+              errorMsg = w.error;
             } else {
               errorMsg = 'unknown error';
             }
           }
-          
+
           return {
             id: w.workerId,
             ok: w.ok,
@@ -150,7 +202,7 @@ export class SearcherController {
             ready: ('ready' in w && w.ready) || false,
             browser: ('browser' in w && w.browser) || 'unknown',
             version: ('version' in w && w.version) ?? null,
-            chromeAlive: ('chrome_alive' in w) ? w.chrome_alive : null,
+            chromeAlive: 'chrome_alive' in w ? w.chrome_alive : null,
             error: errorMsg,
           };
         }),
@@ -164,10 +216,29 @@ export class SearcherController {
   @Get('logs')
   @ApiOperation({ summary: 'Get application logs' })
   @ApiResponse({ status: 200, description: 'Log file contents' })
-  @ApiQuery({ name: 'type', required: false, enum: ['app', 'error'], description: 'Log type (default: app)' })
-  @ApiQuery({ name: 'date', required: false, description: 'Date in YYYY-MM-DD format (default: today)' })
-  @ApiQuery({ name: 'lines', required: false, description: 'Number of lines from end (default: 100)' })
-  @ApiQuery({ name: 'format', required: false, enum: ['json', 'text'], description: 'Output format (default: json)' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['app', 'error'],
+    description: 'Log type (default: app)',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    description: 'Date in YYYY-MM-DD format (default: today)',
+  })
+  @ApiQuery({
+    name: 'lines',
+    required: false,
+    description: 'Number of lines from end (default: 100)',
+  })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['json', 'text'],
+    description: 'Output format (default: json)',
+  })
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getLogs(
     @Res() res: Response,
     @Query('type') type: string = 'app',
@@ -202,8 +273,13 @@ export class SearcherController {
         return res.send(selectedLines.join('\n'));
       }
 
-      const parsedLogs = selectedLines.map(line => {
-        try { return JSON.parse(line); } catch { return { raw: line }; }
+      const parsedLogs = selectedLines.map((line) => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return JSON.parse(line);
+        } catch {
+          return { raw: line };
+        }
       });
 
       return res.json({
@@ -226,21 +302,31 @@ export class SearcherController {
   @Get('logs/files')
   @ApiOperation({ summary: 'List available log files' })
   @ApiResponse({ status: 200, description: 'List of log files' })
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getLogFiles() {
     const logDir = process.env.LOG_DIR || 'logs';
     return { logDir, files: this.getAvailableLogs(logDir) };
   }
 
-  private getAvailableLogs(logDir: string): { name: string; size: number; modified: string }[] {
+  private getAvailableLogs(
+    logDir: string,
+  ): { name: string; size: number; modified: string }[] {
     try {
       if (!fs.existsSync(logDir)) return [];
-      return fs.readdirSync(logDir)
-        .filter(f => f.endsWith('.log'))
-        .map(f => {
+      return fs
+        .readdirSync(logDir)
+        .filter((f) => f.endsWith('.log'))
+        .map((f) => {
           const stat = fs.statSync(path.join(logDir, f));
-          return { name: f, size: stat.size, modified: stat.mtime.toISOString() };
+          return {
+            name: f,
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+          };
         })
         .sort((a, b) => b.modified.localeCompare(a.modified));
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import type { Queue, JobStatus } from 'bull';
+import type { Queue, JobStatus, Job } from 'bull';
 import { JobStatusDto, JobState } from '../dto/job-status.dto';
 import { TimeoutsService } from '../../../../../config/timeouts';
 
@@ -30,7 +30,7 @@ export class SearcherService {
    */
   async enqueue(prompt: string, preferredWorker?: number): Promise<string> {
     this.logger.log(`Enqueuing prompt: ${prompt.substring(0, 50)}...`);
-    
+
     const job = await this.promptQueue.add(
       'process',
       { prompt, worker: preferredWorker } as PromptJobData,
@@ -52,22 +52,25 @@ export class SearcherService {
    */
   async getStatus(jobId: string): Promise<JobStatusDto> {
     const job = await this.promptQueue.getJob(jobId);
-    
+
     if (!job) {
       throw new NotFoundException(`Job ${jobId} not found`);
     }
 
     const state = await job.getState();
-    const progress = job.progress();
+    const progress = job.progress() as Record<string, unknown> | number;
 
     return {
       jobId: String(job.id),
       status: this.mapState(state),
       progress: typeof progress === 'object' ? progress : undefined,
-      result: state === 'completed' ? job.returnvalue : null,
+      result:
+        state === 'completed' ? (job.returnvalue as PromptJobResult) : null,
       error: state === 'failed' ? job.failedReason : null,
       createdAt: new Date(job.timestamp).toISOString(),
-      completedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : null,
+      completedAt: job.finishedOn
+        ? new Date(job.finishedOn).toISOString()
+        : null,
     };
   }
 
@@ -78,17 +81,18 @@ export class SearcherService {
     status?: string,
     limit: number = 50,
     pageToken?: string,
-  ): Promise<{ 
-    items: JobStatusDto[]; 
-    pagination: { 
+  ): Promise<{
+    items: JobStatusDto[];
+    pagination: {
       totalItems: number;
       itemsPerPage: number;
       nextPageToken?: string;
     };
   }> {
-    let allJobs: any[] = [];
+    let allJobs: Job<PromptJobData>[] = [];
 
     if (status) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       allJobs = await this.promptQueue.getJobs([status as JobStatus]);
     } else {
       const [waiting, active, completed, failed, delayed] = await Promise.all([
@@ -98,25 +102,28 @@ export class SearcherService {
         this.promptQueue.getJobs(['failed']),
         this.promptQueue.getJobs(['delayed']),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       allJobs = [...waiting, ...active, ...completed, ...failed, ...delayed];
     }
 
-    allJobs.sort((a, b) => b.timestamp - a.timestamp);
+    allJobs.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 
     const totalItems = allJobs.length;
 
     let startIndex = 0;
     if (pageToken) {
       try {
-        const decoded = JSON.parse(Buffer.from(pageToken, 'base64').toString('utf-8'));
-        startIndex = decoded.offset || 0;
+        const decoded = JSON.parse(
+          Buffer.from(pageToken, 'base64').toString('utf-8'),
+        ) as { offset?: number };
+        startIndex = decoded.offset ?? 0;
       } catch {
         // Invalid token, start from beginning
       }
     }
 
     const paginatedJobs = allJobs.slice(startIndex, startIndex + limit);
-    
+
     const items: JobStatusDto[] = [];
     for (const job of paginatedJobs) {
       try {
@@ -129,7 +136,9 @@ export class SearcherService {
 
     let nextPageToken: string | undefined;
     if (startIndex + limit < totalItems) {
-      nextPageToken = Buffer.from(JSON.stringify({ offset: startIndex + limit })).toString('base64');
+      nextPageToken = Buffer.from(
+        JSON.stringify({ offset: startIndex + limit }),
+      ).toString('base64');
     }
 
     return {
