@@ -7,11 +7,12 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 
 def is_valid_json(json_str: str) -> bool:
-    """Validate JSON string for valid syntax and no placeholder content.
+    """Validate JSON string for required structure and content.
     
     Checks:
     1. Valid JSON syntax
-    2. No placeholder domains like 'example' or 'domain.com' (case-insensitive)
+    2. No 'example' strings in the content (case-insensitive)
+    3. Required field: 'domain' OR 'patterns'
     
     Args:
         json_str: JSON string to validate
@@ -23,14 +24,36 @@ def is_valid_json(json_str: str) -> bool:
         return False
     
     try:
-        # Parse JSON to verify syntax
-        json.loads(json_str)
+        # Parse JSON
+        data = json.loads(json_str)
         
         # Check for placeholder domains in the entire JSON string (case-insensitive)
         json_lower = json_str.lower()
         if 'example' in json_lower or 'domain.com' in json_lower:
             print(f"[VALIDATOR] Rejected: contains placeholder domain ('example' or 'domain.com')")
             return False
+        
+        # Check for required fields: 'domain' OR 'patterns'
+        # Handle both dict and list responses
+        if isinstance(data, dict):
+            has_domain = 'domain' in data
+            has_patterns = 'patterns' in data
+            if not (has_domain or has_patterns):
+                print("[VALIDATOR] Rejected: missing required field 'domain' or 'patterns'")
+                return False
+        elif isinstance(data, list):
+            # For arrays, check if at least one item has the required fields
+            if not data:
+                print("[VALIDATOR] Rejected: empty array")
+                return False
+            # Check first item (assuming homogeneous structure)
+            first_item = data[0]
+            if isinstance(first_item, dict):
+                has_domain = 'domain' in first_item
+                has_patterns = 'patterns' in first_item
+                if not (has_domain or has_patterns):
+                    print("[VALIDATOR] Rejected: array items missing 'domain' or 'patterns'")
+                    return False
         
         return True
         
@@ -184,7 +207,7 @@ def extract_clean_json(text: str) -> str:
     # Keep only valid JSON characters: letters, digits, JSON syntax, whitespace
     # This removes markdown, control characters, and other garbage
     # Allow: a-z A-Z 0-9 {} [] : , " ' . - _ @ space tab
-    cleaned = re.sub(r'[^a-zA-Z0-9{}\[\]:,"\'\.@\-_ \t]', '', cleaned)
+    cleaned = re.sub(r'[^a-zA-Z0-9{}\[\]:,"\'.@\-_ \t]', '', cleaned)
     
     # Find first { or [
     json_start = -1
